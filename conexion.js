@@ -1,62 +1,88 @@
-require('dotenv').config(); // para variables de entorno
+require('dotenv').config();
 
 const express = require('express');
-const mysql = require('mysql');
+const mysql = require('mysql2'); // mejor que mysql
 const app = express();
 
-// ✅ Conexión segura (sin credenciales hardcodeadas)
-const db = mysql.createConnection({
+// ✅ Crear pool de conexiones (mejor práctica)
+const db = mysql.createPool({
   host: 'localhost',
   user: 'root',
-  password: process.env.DB_PASSWORD, // protegida
-  database: 'testdb'
+  password: process.env.DB_PASSWORD,
+  database: 'testdb',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 app.use(express.json());
 
-// ✅ Endpoint protegido contra SQL Injection
+// ✅ Validación básica de entrada
+function isValidUsername(username) {
+  return typeof username === 'string' && username.length > 0 && username.length < 50;
+}
+
+// ✅ Endpoint seguro contra SQL Injection
 app.get('/user', (req, res) => {
   const username = req.query.username;
 
+  if (!isValidUsername(username)) {
+    return res.status(400).send("Parámetro inválido");
+  }
+
   const query = "SELECT * FROM users WHERE username = ?";
 
-  db.query(query, [username], (err, result) => {
+  db.query(query, [username], (err, results) => {
     if (err) {
-      res.status(500).send("Error en la consulta");
-    } else {
-      res.json(result);
+      console.error(err);
+      return res.status(500).send("Error en el servidor");
     }
+    res.json(results);
   });
 });
 
-// ✅ Reemplazo de eval() por alternativa controlada
+// ✅ Eliminamos eval completamente (más seguro)
 app.post('/calc', (req, res) => {
-  const expression = req.body.expression;
+  const { a, b, op } = req.body;
 
-  try {
-    // ⚠️ Validación básica (solo números y operadores)
-    if (!/^[0-9+\-*/(). ]+$/.test(expression)) {
-      return res.status(400).send("Expresión inválida");
-    }
-
-    const result = Function('"use strict"; return (' + expression + ')')();
-    res.send("Resultado: " + result);
-  } catch (e) {
-    res.status(500).send("Error al evaluar");
+  if (typeof a !== 'number' || typeof b !== 'number') {
+    return res.status(400).send("Datos inválidos");
   }
+
+  let result;
+
+  switch (op) {
+    case '+': result = a + b; break;
+    case '-': result = a - b; break;
+    case '*': result = a * b; break;
+    case '/':
+      if (b === 0) return res.status(400).send("División por cero");
+      result = a / b;
+      break;
+    default:
+      return res.status(400).send("Operador inválido");
+  }
+
+  res.json({ result });
 });
 
 // ✅ Cookie segura
 app.get('/login', (req, res) => {
-  res.cookie('sessionId', 'abc123', {
+  res.cookie('sessionId', 'secureRandomValue123', {
     httpOnly: true,
     secure: true,
     sameSite: 'strict'
   });
 
-  res.send("Sesión iniciada de forma segura");
+  res.send("Sesión iniciada correctamente");
+});
+
+// ✅ Manejo de errores global
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Algo salió mal");
 });
 
 app.listen(3000, () => {
-  console.log("Servidor seguro corriendo en puerto 3000");
+  console.log("Servidor corriendo de forma segura en puerto 3000");
 });
