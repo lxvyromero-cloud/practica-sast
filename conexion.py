@@ -1,5 +1,5 @@
-#código de prueba con vulnerabilidad
-def conectar_base_de_datos():
-    usuario = "admin"
-    password = "password123"  # <--- Esto es un Hardcoded Secret 
-    print(f"Conectando con {usuario}...")
+import sqlite3
+def buscar_usuario(nombre):
+    # Esto es vulnerable a SQL Injection (Paso 37 de tu guía)
+    query = "SELECT * FROM usuarios WHERE nombre = '" + nombre + "'"
+    return query
