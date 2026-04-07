@@ -1,51 +1,62 @@
+require('dotenv').config(); // para variables de entorno
+
 const express = require('express');
 const mysql = require('mysql');
 const app = express();
 
-// ❌ Hardcoded credentials (VULNERABILIDAD)
+// ✅ Conexión segura (sin credenciales hardcodeadas)
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  password: '123456', // contraseña expuesta
+  password: process.env.DB_PASSWORD, // protegida
   database: 'testdb'
 });
 
 app.use(express.json());
 
-// ❌ Endpoint vulnerable a SQL Injection
+// ✅ Endpoint protegido contra SQL Injection
 app.get('/user', (req, res) => {
   const username = req.query.username;
 
-  // ❌ Concatenación directa (SQL Injection)
-  const query = "SELECT * FROM users WHERE username = '" + username + "'";
+  const query = "SELECT * FROM users WHERE username = ?";
 
-  db.query(query, (err, result) => {
+  db.query(query, [username], (err, result) => {
     if (err) {
-      res.send("Error en la consulta");
+      res.status(500).send("Error en la consulta");
     } else {
       res.json(result);
     }
   });
 });
 
-// ❌ Uso de eval (muy inseguro)
+// ✅ Reemplazo de eval() por alternativa controlada
 app.post('/calc', (req, res) => {
   const expression = req.body.expression;
 
   try {
-    const result = eval(expression); // peligroso
+    // ⚠️ Validación básica (solo números y operadores)
+    if (!/^[0-9+\-*/(). ]+$/.test(expression)) {
+      return res.status(400).send("Expresión inválida");
+    }
+
+    const result = Function('"use strict"; return (' + expression + ')')();
     res.send("Resultado: " + result);
   } catch (e) {
-    res.send("Error");
+    res.status(500).send("Error al evaluar");
   }
 });
 
-// ❌ Cookie insegura
+// ✅ Cookie segura
 app.get('/login', (req, res) => {
-  res.cookie('sessionId', 'abc123'); // sin HttpOnly ni Secure
-  res.send("Sesión iniciada");
+  res.cookie('sessionId', 'abc123', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict'
+  });
+
+  res.send("Sesión iniciada de forma segura");
 });
 
 app.listen(3000, () => {
-  console.log("Servidor corriendo en puerto 3000");
+  console.log("Servidor seguro corriendo en puerto 3000");
 });
