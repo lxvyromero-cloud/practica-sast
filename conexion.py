@@ -1,9 +1,9 @@
 import sqlite3
 
-def consultar_usuario(id_usuario):
-    db = sqlite3.connect("datos.db")
+def buscar_usuario(username):
+    db = sqlite3.connect("database.db")
     cursor = db.cursor()
-    # Esto es una vulnerabilidad de Inyección SQL (concatenación directa)
-    query = "SELECT * FROM usuarios WHERE id = " + id_usuario
+    # ERROR CRÍTICO: Inyección SQL por concatenación directa
+    query = "SELECT * FROM users WHERE name = '" + username + "'"
     cursor.execute(query)
     return cursor.fetchone()
